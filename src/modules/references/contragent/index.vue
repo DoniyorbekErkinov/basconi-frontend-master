@@ -1,0 +1,229 @@
+<template>
+  <div>
+    <q-table
+      class="q-mx-auto shadow-10"
+      bordered
+      row-key="id"
+      row="row"
+      :data="contragents"
+      :columns="columns"
+      :hide-pagination="true"
+      :rows-per-page-options="[0]"
+    >
+      <template v-slot:top>
+        <div class="q-table__title">{{ $t('references.contragent') }}</div>
+        <q-space/>
+        <vs-button  success animation-type="rotate" @click="createForm">
+          <q-icon name="add"/>
+          <template #animate>
+            <q-icon name="add"/>
+          </template>
+        </vs-button>
+      </template>
+      <template v-slot:body-cell-id="props">
+        <q-td class="text-center">{{ props.rowIndex+1 }}</q-td>
+      </template>
+      <template v-slot:body-cell-code="props">
+        <q-td class="text-center">
+          <q-badge>{{ props.row.code }}</q-badge>
+        </q-td>
+      </template>
+      <template v-slot:body-cell-action="props">
+        <q-td
+        class="text-center">
+          <vs-button v-if="$can('Update', 'Contragent')" style="display: inline-block" flat icon primary @click="editForm(props.row)">
+            <q-icon name="edit"/>
+          </vs-button>
+          <vs-button v-if="$can('delete', 'Contragent')" style="display: inline-block" flat icon danger @click="deleteModalTrue(props.row.id)">
+            <q-icon name="delete"/>
+          </vs-button>
+        </q-td>
+      </template>
+    </q-table>
+    <!--    Create / Edit   -->
+    <vs-dialog blur prevent-close v-model="createModal">
+      <template #header>
+        <b v-if="create">{{ $t('references.new_contragent') }}</b>
+        <b v-else>{{ $t('references.edit_contragent') }}</b>
+      </template>
+      <q-separator/>
+      <validation-observer ref="categoryForm" v-slot="{}">
+        <validation-provider v-slot="{valid}" rules="required" name="name">
+          <vs-input
+              state="primary"
+            block
+            shadow
+            class="mt-3"
+            :danger="!valid"
+            :placeholder="$t('doc.name')"
+            v-model="form.name"
+            :label="$t('doc.name')"
+            :class="!valid ? 'required' : ''"
+          />
+        </validation-provider>
+        <validation-provider v-slot="{valid}" rules="required" name="address">
+          <vs-input
+              state="primary"
+              block
+              class="mt-3"
+              :danger="!valid"
+              v-model="form.address"
+              :placeholder="$t('doc.address')"
+              :label="$t('doc.address')"
+              :class="!valid ? 'required' : ''"
+          />
+        </validation-provider>
+        <validation-provider v-slot="{valid}" rules="required" name="phoneNumber">
+          <vs-input
+              state="primary"
+            block
+            class="mt-3"
+            :danger="!valid"
+            v-mask="'+998-##-###-##-##'"
+            v-model="form.phoneNumber"
+            :label="$t('doc.phone_number')"
+            :placeholder="$t('doc.phone_number')"
+            :class="!valid ? 'required' : ''"
+            @keyup.enter="save"
+          />
+        </validation-provider>
+      </validation-observer>
+      <template #footer>
+        <vs-button @keyup.enter="save" class="mt-2" block primary gradient @click="save">{{ $t('actions.save') }}</vs-button>
+      </template>
+    </vs-dialog>
+    <!--     Delete     -->
+    <confirm-modal :model="deleteModal" @submit="deleteContragent" @close="deleteModal = false" :text="$t('confirm_delete')"/>
+  </div>
+</template>
+
+<script>
+import ConfirmModal from "../../../components/confirmModal";
+import ContragentService from "./contragent.servie";
+
+export default {
+  name: "index",
+  components: {ConfirmModal},
+  data() {
+    return {
+      contragents: [],
+      columns: [
+        {name: 'id', align: 'center', label: this.$t('doc.index'), field: 'index'},
+        {name: 'name', align: 'center', label: this.$t('doc.name'), field: 'name'},
+        {name: 'phoneNumber', align: 'center', label: this.$t('doc.phone_number'), field: 'phoneNumber'},
+        {name: 'manzil', align: 'center', label: this.$t('doc.address'), field: 'address'},
+        {name: 'action', align: 'center', label: this.$t('doc.action'), field: 'action'}
+      ],
+      create: true,
+      createModal: false,
+      form: {
+        phoneNumber: '+998-',
+        name: '',
+        address: ''
+      },
+      contragentId: null,
+      deleteModal: false,
+    }
+  },
+  watch: {},
+  methods: {
+    getContragentsList() {
+      ContragentService.getContragents().then(res => {
+        this.contragents = res.data
+      }).catch(e => {
+        this.$vs.notification({
+          duration: 1000,
+          title: e.message,
+          progress: 'auto',
+          color: 'danger',
+          position: 'top-right'
+        })
+      })
+    },
+    createForm() {
+      this.create = true
+      this.form = {}
+      this.createModal = true
+    },
+    editForm(item) {
+      this.create = false
+      this.form = item
+      this.createModal = true
+    },
+    deleteModalTrue(id) {
+      this.contragentId = id
+      this.deleteModal = true
+    },
+    deleteContragent() {
+      ContragentService.deleteContragents(this.contragentId).then(res => {
+        this.deleteModal = false
+        this.getContragentsList();
+      }).catch(e => {
+        this.$vs.notification({
+          title: e.message,
+          duration: 1000,
+          progress: 'auto',
+          color: 'danger',
+          position: 'top-right'
+        })
+      })
+    },
+    save() {
+      this.$refs.categoryForm.validate().then(valid => {
+        if (valid) {
+          if (this.create) {
+            ContragentService.createContragents(this.form).then(res => {
+              this.createModal = false
+              this.getContragentsList();
+            }).catch(e => {
+              this.$vs.notification({
+                title: e.message,
+                duration: 1000,
+                progress: 'auto',
+                color: 'danger',
+                position: 'top-right'
+              })
+            })
+          } else {
+            ContragentService.updateContragents(this.form).then(res => {
+              this.createModal = false
+              this.getContragentsList();
+            }).catch(e => {
+              this.$vs.notification({
+                title: e.message,
+                duration: 1000,
+                progress: 'auto',
+                color: 'danger',
+                position: 'top-right'
+              })
+            })
+          }
+        } else {
+          this.$vs.notification({
+            duration: 1000,
+            title: this.$t('required_error'),
+            progress: 'auto',
+            color: 'danger',
+            position: 'top-right'
+          })
+        }
+      }).catch(e => {
+        this.$vs.notification({
+          title: e.message,
+          duration: 1000,
+          progress: 'auto',
+          color: 'danger',
+          position: 'top-right'
+        })
+      })
+    },   
+  },
+  created() {
+    this.getContragentsList();
+  }
+}
+</script>
+
+<style scoped>
+
+</style>
